@@ -43,6 +43,7 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     const usersCollection = client.db("codeStack").collection("users");
+    const queriesCollection = client.db("codeStack").collection("queries");
 
     app.post("/jwt", (req, res) => {
       const user = req.body;
@@ -65,6 +66,14 @@ async function run() {
         return res.send({ message: "User already exists" });
       }
       const result = await usersCollection.insertOne(user);
+      res.send(result);
+    });
+
+    // add a questions api
+
+    app.post("/queries", async (req, res) => {
+      const queriesData = req.body;
+      const result = await queriesCollection.insertOne(queriesData);
       res.send(result);
     });
 
