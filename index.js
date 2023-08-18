@@ -88,9 +88,9 @@ async function run() {
 
     // add a questions api
 
-    app.post("/queries", async (req, res) => {
-      const queriesData = req.body;
-      const result = await queriesCollection.insertOne(queriesData);
+    app.post("/questions", async (req, res) => {
+      const quesData = req.body;
+      const result = await questionsCollection.insertOne(quesData);
       res.send(result);
     });
     app.get("/questions", async (req, res) => {
