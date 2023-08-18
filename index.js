@@ -71,6 +71,11 @@ async function run() {
 
     // add a questions api
 
+    app.get("/queries", async (req, res) => {
+      const result = await queriesCollection.find().toArray();
+      res.send(result);
+    })
+
     app.post("/queries", async (req, res) => {
       const queriesData = req.body;
       const result = await queriesCollection.insertOne(queriesData);
@@ -78,7 +83,7 @@ async function run() {
     });
 
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
