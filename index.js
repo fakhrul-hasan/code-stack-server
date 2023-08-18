@@ -46,7 +46,7 @@ async function run() {
     await client.connect();
     
     const usersCollection = client.db("codeStack").collection("users");
-    const queriesCollection = client.db("codeStack").collection("queries");
+    const questionsCollection = client.db("codeStack").collection("questions");
 
     app.post("/jwt", (req, res) => {
       const user = req.body;
@@ -72,6 +72,20 @@ async function run() {
       res.send(result);
     });
 
+    app.patch('/users/:id', verifyJWT, async(req,res)=>{
+      const id = req.params.id;
+      const data = req.body;
+      const filter = {_id: new ObjectId(id)};
+      const updateDoc ={
+        $set:{
+          name: data.name,
+          photo: data.photo
+        }
+      }
+      const result = await classCollection.updateOne(filter, updateDoc);
+      res.send(result);
+    })
+
     // add a questions api
 
     app.post("/queries", async (req, res) => {
@@ -79,6 +93,10 @@ async function run() {
       const result = await queriesCollection.insertOne(queriesData);
       res.send(result);
     });
+    app.get("/questions", async (req, res) => {
+      const result = await questionsCollection.find().toArray();
+      res.send(result);
+    })
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
