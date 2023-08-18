@@ -43,7 +43,7 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
     
     const usersCollection = client.db("codeStack").collection("users");
     const queriesCollection = client.db("codeStack").collection("queries");
@@ -73,6 +73,11 @@ async function run() {
     });
 
     // add a questions api
+
+    app.get("/queries", async (req, res) => {
+      const result = await queriesCollection.find().toArray();
+      res.send(result);
+    })
 
     app.post("/queries", async (req, res) => {
       const queriesData = req.body;
