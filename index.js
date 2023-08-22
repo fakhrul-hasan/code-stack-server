@@ -93,6 +93,7 @@ async function run() {
       const result = await questionsCollection.insertOne(quesData);
       res.send(result);
     });
+    
     app.get("/questions", async (req, res) => {
       const result = await questionsCollection.find().toArray();
       res.send(result);
