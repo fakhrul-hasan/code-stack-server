@@ -44,7 +44,7 @@ async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
-    
+
     const usersCollection = client.db("codeStack").collection("users");
     const questionsCollection = client.db("codeStack").collection("questions");
 
@@ -72,12 +72,45 @@ async function run() {
       res.send(result);
     });
 
-    app.patch('/users/:id', verifyJWT, async(req,res)=>{
+    //Get User With Email Query
+    app.get('/user', async (req, res) => {
+      const userEmail = req.query.email;
+      const query = { email: userEmail };
+      const result = await usersCollection.findOne(query);
+      res.send(result);
+    });
+
+    // Update user info
+    app.put('/user/:email', async (req, res) => {
+      const email = req.params.email;
+      const filter = { email: email }
+      const options = { upsert: true };
+      const updatedUser = req.body;
+      const newUser = {
+          $set: {
+              name: updatedUser.name,
+              age: updatedUser.age,
+              gender: updatedUser.gender,
+              portfolioURL: updatedUser.portfolioURL,
+              country: updatedUser.country,
+              city: updatedUser.city,
+              facebookURL: updatedUser.facebookURL,
+              twitterURL: updatedUser.twitterURL,
+              githubURL: updatedUser.githubURL,
+              selected: updatedUser.selected,
+              aboutMe: updatedUser.aboutMe,
+          }
+      }
+      const result = await usersCollection.updateOne(filter, newUser, options);
+      res.send(result)
+  })
+
+    app.patch('/users/:id', verifyJWT, async (req, res) => {
       const id = req.params.id;
       const data = req.body;
-      const filter = {_id: new ObjectId(id)};
-      const updateDoc ={
-        $set:{
+      const filter = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: {
           name: data.name,
           photo: data.photo
         }
@@ -87,12 +120,12 @@ async function run() {
     })
 
     // add a questions api
-
     app.post("/questions", async (req, res) => {
       const quesData = req.body;
       const result = await questionsCollection.insertOne(quesData);
       res.send(result);
     });
+
     app.get("/questions", async (req, res) => {
       const result = await questionsCollection.find().toArray();
       res.send(result);
