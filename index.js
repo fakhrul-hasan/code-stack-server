@@ -131,6 +131,25 @@ async function run() {
       res.send(result);
     })
 
+    // Check valid or non valid username
+    app.get("/check-username", async (req, res) => {
+      const username = req.query.username;
+    
+      if (!username) {
+        return res.status(400).send({ error: true, message: "Username is required" });
+      }
+    
+      const query = { username: username };
+      const existingUser = await usersCollection.findOne(query);
+    
+      if (existingUser) {
+        res.send({ message: "Username already exists!" });
+      } else {
+        res.send({ message: "You can take it!" });
+      }
+    });
+    
+
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
