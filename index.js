@@ -89,6 +89,7 @@ async function run() {
       const newUser = {
           $set: {
               name: updatedUser.name,
+              imgURL: updatedUser.imgURL,
               age: updatedUser.age,
               gender: updatedUser.gender,
               portfolioURL: updatedUser.portfolioURL,
