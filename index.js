@@ -28,7 +28,7 @@ const verifyJWT = (req, res, next) => {
   });
 };
 
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const uri = `mongodb+srv://${process.env.DB_User}:${process.env.DB_Pass}@cluster0.d17riyo.mongodb.net/?retryWrites=true&w=majority`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -89,6 +89,7 @@ async function run() {
       const newUser = {
           $set: {
               name: updatedUser.name,
+              imgURL: updatedUser.imgURL,
               age: updatedUser.age,
               gender: updatedUser.gender,
               portfolioURL: updatedUser.portfolioURL,
@@ -130,6 +131,33 @@ async function run() {
       const result = await questionsCollection.find().toArray();
       res.send(result);
     })
+
+    // Check valid or non valid username
+    app.get("/check-username", async (req, res) => {
+      const username = req.query.username;
+    
+      if (!username) {
+        return res.status(400).send({ error: true, message: "Username is required" });
+      }
+    
+      const query = { username: username };
+      const existingUser = await usersCollection.findOne(query);
+    
+      if (existingUser) {
+        res.send({ message: "Username already exists!" });
+      } else {
+        res.send({ message: "You can take it!" });
+      }
+    });
+
+    //Get Details with id
+    app.get('/question-details/:id', async(req, res) => {
+      const id = req.params.id;
+      const query = {_id: new ObjectId(id)}
+      const result = await questionsCollection.findOne(query);
+      res.send(result);
+    })
+    
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
