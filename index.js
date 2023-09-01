@@ -28,7 +28,7 @@ const verifyJWT = (req, res, next) => {
   });
 };
 
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const uri = `mongodb+srv://${process.env.DB_User}:${process.env.DB_Pass}@cluster0.d17riyo.mongodb.net/?retryWrites=true&w=majority`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -85,34 +85,8 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/users/admin/:email", verifyJWT, async (req, res) => {
-      const email = req.params.email;
-
-      if (req.decoded.email !== email) {
-        return res.send({ admin: false });
-      }
-
-      const query = { email: email };
-      const user = await usersCollection.findOne(query);
-      const result = { admin: user?.role === "admin" };
-      res.send(result);
-    });
-
-    app.patch("/users/admin/:id", async (req, res) => {
-      const id = req.params.id;
-      const newRole = req.body.role;
-      const filter = { _id: new ObjectId(id) };
-      const updatedDoc = {
-        $set: {
-          role: newRole,
-        },
-      };
-      const result = await usersCollection.updateOne(filter, updatedDoc);
-      res.send(result);
-    });
-
     //Get User With Email Query
-    app.get("/user", async (req, res) => {
+    app.get('/user', async (req, res) => {
       const userEmail = req.query.email;
       const query = { email: userEmail };
       const result = await usersCollection.findOne(query);
@@ -120,31 +94,32 @@ async function run() {
     });
 
     // Update user info
-    app.put("/user/:email", async (req, res) => {
+    app.put('/user/:email', async (req, res) => {
       const email = req.params.email;
-      const filter = { email: email };
+      const filter = { email: email }
       const options = { upsert: true };
       const updatedUser = req.body;
       const newUser = {
-        $set: {
-          name: updatedUser.name,
-          age: updatedUser.age,
-          gender: updatedUser.gender,
-          portfolioURL: updatedUser.portfolioURL,
-          country: updatedUser.country,
-          city: updatedUser.city,
-          facebookURL: updatedUser.facebookURL,
-          twitterURL: updatedUser.twitterURL,
-          githubURL: updatedUser.githubURL,
-          selected: updatedUser.selected,
-          aboutMe: updatedUser.aboutMe,
-        },
-      };
+          $set: {
+              name: updatedUser.name,
+              imgURL: updatedUser.imgURL,
+              age: updatedUser.age,
+              gender: updatedUser.gender,
+              portfolioURL: updatedUser.portfolioURL,
+              country: updatedUser.country,
+              city: updatedUser.city,
+              facebookURL: updatedUser.facebookURL,
+              twitterURL: updatedUser.twitterURL,
+              githubURL: updatedUser.githubURL,
+              selected: updatedUser.selected,
+              aboutMe: updatedUser.aboutMe,
+          }
+      }
       const result = await usersCollection.updateOne(filter, newUser, options);
-      res.send(result);
-    });
+      res.send(result)
+  })
 
-    app.patch("/users/:id", verifyJWT, async (req, res) => {
+    app.patch('/users/:id', verifyJWT, async (req, res) => {
       const id = req.params.id;
       const data = req.body;
       const filter = { _id: new ObjectId(id) };
@@ -168,7 +143,34 @@ async function run() {
     app.get("/questions", async (req, res) => {
       const result = await questionsCollection.find().toArray();
       res.send(result);
+    })
+
+    // Check valid or non valid username
+    app.get("/check-username", async (req, res) => {
+      const username = req.query.username;
+    
+      if (!username) {
+        return res.status(400).send({ error: true, message: "Username is required" });
+      }
+    
+      const query = { username: username };
+      const existingUser = await usersCollection.findOne(query);
+    
+      if (existingUser) {
+        res.send({ message: "Username already exists!" });
+      } else {
+        res.send({ message: "You can take it!" });
+      }
     });
+
+    //Get Details with id
+    app.get('/question-details/:id', async(req, res) => {
+      const id = req.params.id;
+      const query = {_id: new ObjectId(id)}
+      const result = await questionsCollection.findOne(query);
+      res.send(result);
+    })
+    
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
