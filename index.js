@@ -56,6 +56,19 @@ async function run() {
       res.send({ token });
     });
 
+    // verify admin
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.decoded.email;
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      if (user?.role !== "admin") {
+        return res
+          .status(403)
+          .send({ error: true, message: "Forbidden Access" });
+      }
+      next();
+    };
+
     app.get("/users", async (req, res) => {
       const result = await usersCollection.find().toArray();
       res.send(result);
@@ -113,12 +126,12 @@ async function run() {
       const updateDoc = {
         $set: {
           name: data.name,
-          photo: data.photo
-        }
-      }
+          photo: data.photo,
+        },
+      };
       const result = await classCollection.updateOne(filter, updateDoc);
       res.send(result);
-    })
+    });
 
     // add a questions api
     app.post("/questions", async (req, res) => {
