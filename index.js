@@ -44,7 +44,7 @@ async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
-    
+
     const usersCollection = client.db("codeStack").collection("users");
     const questionsCollection = client.db("codeStack").collection("questions");
 
@@ -55,6 +55,19 @@ async function run() {
       });
       res.send({ token });
     });
+
+    // verify admin
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.decoded.email;
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      if (user?.role !== "admin") {
+        return res
+          .status(403)
+          .send({ error: true, message: "Forbidden Access" });
+      }
+      next();
+    };
 
     app.get("/users", async (req, res) => {
       const result = await usersCollection.find().toArray();
@@ -72,31 +85,90 @@ async function run() {
       res.send(result);
     });
 
-    app.patch('/users/:id', verifyJWT, async(req,res)=>{
+    app.get("/users/admin/:email", verifyJWT, async (req, res) => {
+      const email = req.params.email;
+
+      if (req.decoded.email !== email) {
+        return res.send({ admin: false });
+      }
+
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      const result = { admin: user?.role === "admin" };
+      res.send(result);
+    });
+
+    app.patch("/users/admin/:id", async (req, res) => {
+      const id = req.params.id;
+      const newRole = req.body.role;
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          role: newRole,
+        },
+      };
+      const result = await usersCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    });
+
+    //Get User With Email Query
+    app.get("/user", async (req, res) => {
+      const userEmail = req.query.email;
+      const query = { email: userEmail };
+      const result = await usersCollection.findOne(query);
+      res.send(result);
+    });
+
+    // Update user info
+    app.put("/user/:email", async (req, res) => {
+      const email = req.params.email;
+      const filter = { email: email };
+      const options = { upsert: true };
+      const updatedUser = req.body;
+      const newUser = {
+        $set: {
+          name: updatedUser.name,
+          age: updatedUser.age,
+          gender: updatedUser.gender,
+          portfolioURL: updatedUser.portfolioURL,
+          country: updatedUser.country,
+          city: updatedUser.city,
+          facebookURL: updatedUser.facebookURL,
+          twitterURL: updatedUser.twitterURL,
+          githubURL: updatedUser.githubURL,
+          selected: updatedUser.selected,
+          aboutMe: updatedUser.aboutMe,
+        },
+      };
+      const result = await usersCollection.updateOne(filter, newUser, options);
+      res.send(result);
+    });
+
+    app.patch("/users/:id", verifyJWT, async (req, res) => {
       const id = req.params.id;
       const data = req.body;
-      const filter = {_id: new ObjectId(id)};
-      const updateDoc ={
-        $set:{
+      const filter = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: {
           name: data.name,
-          photo: data.photo
-        }
-      }
+          photo: data.photo,
+        },
+      };
       const result = await classCollection.updateOne(filter, updateDoc);
       res.send(result);
-    })
+    });
 
     // add a questions api
-
     app.post("/questions", async (req, res) => {
       const quesData = req.body;
       const result = await questionsCollection.insertOne(quesData);
       res.send(result);
     });
+
     app.get("/questions", async (req, res) => {
       const result = await questionsCollection.find().toArray();
       res.send(result);
-    })
+    });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
