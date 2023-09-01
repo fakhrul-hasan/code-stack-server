@@ -47,6 +47,7 @@ async function run() {
 
     const usersCollection = client.db("codeStack").collection("users");
     const questionsCollection = client.db("codeStack").collection("questions");
+    const answerCollection = client.db("codeStack").collection("answers");
 
     app.post("/jwt", (req, res) => {
       const user = req.body;
@@ -87,37 +88,23 @@ async function run() {
       const options = { upsert: true };
       const updatedUser = req.body;
       const newUser = {
-          $set: {
-              name: updatedUser.name,
-              imgURL: updatedUser.imgURL,
-              age: updatedUser.age,
-              gender: updatedUser.gender,
-              portfolioURL: updatedUser.portfolioURL,
-              country: updatedUser.country,
-              city: updatedUser.city,
-              facebookURL: updatedUser.facebookURL,
-              twitterURL: updatedUser.twitterURL,
-              githubURL: updatedUser.githubURL,
-              selected: updatedUser.selected,
-              aboutMe: updatedUser.aboutMe,
-          }
+        $set: {
+          name: updatedUser.name,
+          imgURL: updatedUser.imgURL,
+          age: updatedUser.age,
+          gender: updatedUser.gender,
+          portfolioURL: updatedUser.portfolioURL,
+          country: updatedUser.country,
+          city: updatedUser.city,
+          facebookURL: updatedUser.facebookURL,
+          twitterURL: updatedUser.twitterURL,
+          githubURL: updatedUser.githubURL,
+          selected: updatedUser.selected,
+          aboutMe: updatedUser.aboutMe,
+        }
       }
       const result = await usersCollection.updateOne(filter, newUser, options);
       res.send(result)
-  })
-
-    app.patch('/users/:id', verifyJWT, async (req, res) => {
-      const id = req.params.id;
-      const data = req.body;
-      const filter = { _id: new ObjectId(id) };
-      const updateDoc = {
-        $set: {
-          name: data.name,
-          photo: data.photo
-        }
-      }
-      const result = await classCollection.updateOne(filter, updateDoc);
-      res.send(result);
     })
 
     // add a questions api
@@ -127,6 +114,7 @@ async function run() {
       res.send(result);
     });
 
+    //Get the Questions
     app.get("/questions", async (req, res) => {
       const result = await questionsCollection.find().toArray();
       res.send(result);
@@ -135,14 +123,14 @@ async function run() {
     // Check valid or non valid username
     app.get("/check-username", async (req, res) => {
       const username = req.query.username;
-    
+
       if (!username) {
         return res.status(400).send({ error: true, message: "Username is required" });
       }
-    
+
       const query = { username: username };
       const existingUser = await usersCollection.findOne(query);
-    
+
       if (existingUser) {
         res.send({ message: "Username already exists!" });
       } else {
@@ -151,13 +139,49 @@ async function run() {
     });
 
     //Get Details with id
-    app.get('/question-details/:id', async(req, res) => {
+    app.get('/question-details/:id', async (req, res) => {
       const id = req.params.id;
-      const query = {_id: new ObjectId(id)}
+      const query = { _id: new ObjectId(id) }
       const result = await questionsCollection.findOne(query);
       res.send(result);
     })
-    
+
+    //Post Answers
+    app.post("/answers", async (req, res) => {
+      const ansData = req.body;
+      const result = await answerCollection.insertOne(ansData);
+      res.send(result);
+    });
+
+    //Get Answers
+    app.get("/answers", async (req, res) => {
+      const result = await answerCollection.find().toArray();
+      res.send(result);
+    })
+
+    //Set the answer id in the questions
+    app.patch('/question/:id', async (req, res) => {
+      const id = req.params.id;
+      console.log('Received data:', req.body);
+
+      const filter = { _id: new ObjectId(id) }
+      const updatedUser = req.body;
+      const newData = {
+        $set: {
+          answersId: updatedUser.answersId,
+        }
+      }
+      const result = await questionsCollection.updateOne(filter, newData);
+      res.send(result)
+    })
+
+    //Email query for the get answer
+    app.get('/answer/:id', async (req, res) => {
+      const id = req.params.id;
+      const query = { questionID: id }
+      const result = await answerCollection.find(query).toArray();
+      res.send(result);
+    })
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
