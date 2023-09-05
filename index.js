@@ -175,11 +175,19 @@ async function run() {
       res.send(result)
     })
 
-    //Email query for the get answer
+    //ID query for the get answer
     app.get('/answer/:id', async (req, res) => {
       const id = req.params.id;
       const query = { questionID: id }
       const result = await answerCollection.find(query).toArray();
+      res.send(result);
+    })
+
+    //Email query for the get questions
+    app.get('/questions/:email', async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email }
+      const result = await questionsCollection.find(query).toArray();
       res.send(result);
     })
 
