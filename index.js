@@ -135,7 +135,7 @@ async function run() {
 
     // add a questions api
     app.post("/questions", async (req, res) => {
-      const quesData = req.body;
+      const quesData = {like: [], ...req.body};
       const result = await questionsCollection.insertOne(quesData);
       res.send(result);
     });
