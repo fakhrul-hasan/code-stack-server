@@ -135,7 +135,7 @@ async function run() {
 
     // add a questions api
     app.post("/questions", async (req, res) => {
-      const quesData = {like: [], ...req.body};
+      const quesData = req.body;
       const result = await questionsCollection.insertOne(quesData);
       res.send(result);
     });
@@ -169,6 +169,18 @@ async function run() {
       const query = {_id: new ObjectId(id)}
       const result = await questionsCollection.findOne(query);
       res.send(result);
+    })
+
+    app.post('/like/:id', async(req, res)=>{
+      const queId = req.params.id;
+      const user = req.query.user;
+      console.log(queId, user);
+      const filter = {_id: new ObjectId(queId)}
+      const updateDoc ={
+        $addToSet: {likes: user}
+      };
+      const updateResult = await questionsCollection.updateOne(filter, updateDoc);
+      res.send({updateResult});
     })
     
 
