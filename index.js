@@ -234,7 +234,7 @@ async function run() {
       console.log(queId, user);
       const filter = {_id: new ObjectId(queId)}
       const updateDoc ={
-        $addToSet: {likes: user}
+        $addToSet: {QuestionsVote: user}
       };
       const updateResult = await questionsCollection.updateOne(filter, updateDoc);
       res.send({updateResult});
