@@ -57,6 +57,19 @@ async function run() {
       res.send({ token });
     });
 
+    // verify admin
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.decoded.email;
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      if (user?.role !== "admin") {
+        return res
+          .status(403)
+          .send({ error: true, message: "Forbidden Access" });
+      }
+      next();
+    };
+
     app.get("/users", async (req, res) => {
       const result = await usersCollection.find().toArray();
       res.send(result);
@@ -105,7 +118,21 @@ async function run() {
       }
       const result = await usersCollection.updateOne(filter, newUser, options);
       res.send(result)
-    })
+  })
+
+    app.patch('/users/:id', verifyJWT, async (req, res) => {
+      const id = req.params.id;
+      const data = req.body;
+      const filter = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: {
+          name: data.name,
+          photo: data.photo,
+        },
+      };
+      const result = await classCollection.updateOne(filter, updateDoc);
+      res.send(result);
+    });
 
     // add a questions api
     app.post("/questions", async (req, res) => {
@@ -146,73 +173,18 @@ async function run() {
       res.send(result);
     })
 
-    //Post Answers
-    app.post("/answers", async (req, res) => {
-      const ansData = req.body;
-      const result = await answerCollection.insertOne(ansData);
-      res.send(result);
-    });
-
-    //Get Answers
-    app.get("/answers", async (req, res) => {
-      const result = await answerCollection.find().toArray();
-      res.send(result);
+    app.post('/like/:id', async(req, res)=>{
+      const queId = req.params.id;
+      const user = req.query.user;
+      console.log(queId, user);
+      const filter = {_id: new ObjectId(queId)}
+      const updateDoc ={
+        $addToSet: {likes: user}
+      };
+      const updateResult = await questionsCollection.updateOne(filter, updateDoc);
+      res.send({updateResult});
     })
-
-    //Set the answer id in the questions
-    app.patch('/question/:id', async (req, res) => {
-      const id = req.params.id;
-      console.log('Received data:', req.body);
-
-      const filter = { _id: new ObjectId(id) }
-      const updatedUser = req.body;
-      const newData = {
-        $set: {
-          answersId: updatedUser.answersId,
-        }
-      }
-      const result = await questionsCollection.updateOne(filter, newData);
-      res.send(result)
-    })
-
-    //ID query for the get answer
-    app.get('/answer/:id', async (req, res) => {
-      const id = req.params.id;
-      const query = { questionID: id }
-      const result = await answerCollection.find(query).toArray();
-      res.send(result);
-    })
-
-    //Email query for the get questions
-    app.get('/questions/:email', async (req, res) => {
-      const email = req.params.email;
-      const query = { email: email }
-      const result = await questionsCollection.find(query).toArray();
-      res.send(result);
-    })
-
-    //Email query for the get Answers
-    app.get('/answers/:email', async (req, res) => {
-      const email = req.params.email;
-      const query = { email: email }
-      const result = await answerCollection.find(query).toArray();
-      res.send(result);
-    })
-
-    // Add questions view count to database
-    app.put('/question-detail/:id', async (req, res) => {
-      const id = req.params.id;
-      const filter = { _id: new ObjectId(id) }
-      const options = { upsert: true };
-      const updatedQuestion = req.body;
-      const newDetails = {
-        $set: {
-          totalViews: updatedQuestion.clickCount,
-        }
-      }
-      const result = await questionsCollection.updateOne(filter, newDetails, options);
-      res.send(result)
-    })
+    
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
