@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config({ path: "./.env" });
 const app = express();
+const jwt = require('jsonwebtoken');
 const port = process.env.PORT || 5000;
 
 app.use(cors());
@@ -83,6 +84,45 @@ async function run() {
         return res.send({ message: "User already exists" });
       }
       const result = await usersCollection.insertOne(user);
+      res.send(result);
+    });
+
+    app.get("/users/admin/:email", verifyJWT, async (req, res) => {
+      const email = req.params.email;
+
+      if (req.decoded.email !== email) {
+        return res.send({ admin: false });
+      }
+
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      const result = { admin: user?.role === "admin" };
+      res.send(result);
+    });
+
+    app.patch("/users/admin/:id", async (req, res) => {
+      const id = req.params.id;
+      const newRole = req.body.role;
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          role: newRole,
+        },
+      };
+      const result = await usersCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    });
+
+    app.patch("/users/normalUser/:id", async (req, res) => {
+      const id = req.params.id;
+      const newRole = req.body.role;
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          role: newRole,
+        },
+      };
+      const result = await usersCollection.updateOne(filter, updatedDoc);
       res.send(result);
     });
 
@@ -239,6 +279,47 @@ async function run() {
       const updateResult = await questionsCollection.updateOne(filter, updateDoc);
       res.send({updateResult});
     })
+
+    app.get("/statistics", verifyJWT, verifyAdmin, async (req, res) => {
+      try {
+        const pipeline = [
+          {
+            $group: {
+              _id: null,
+              usersCount: { $sum: 1 },
+              questionsCount: { $sum: 1 },
+              answersCount: { $sum: 1 },
+            },
+          },
+          {
+            $project: {
+              _id: 0,
+              usersCount: 1,
+              questionsCount: 1,
+              answersCount: 1,
+            },
+          },
+        ];
+    
+        const statistics = await Promise.all([
+          usersCollection.aggregate(pipeline).toArray(),
+          questionsCollection.aggregate(pipeline).toArray(),
+          answerCollection.aggregate(pipeline).toArray(),
+        ]);
+    
+        // Combine the results into a single object
+        const result = {
+          usersCount: statistics[0][0]?.usersCount || 0,
+          questionsCount: statistics[1][0]?.questionsCount || 0,
+          answersCount: statistics[2][0]?.answersCount || 0,
+        };
+    
+        res.json(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Server error" });
+      }
+    });
     
 
     // Send a ping to confirm a successful connection
