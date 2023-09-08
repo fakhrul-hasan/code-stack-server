@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config({ path: "./.env" });
 const app = express();
+const jwt = require('jsonwebtoken');
 const port = process.env.PORT || 5000;
 
 app.use(cors());
@@ -43,10 +44,11 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
 
     const usersCollection = client.db("codeStack").collection("users");
     const questionsCollection = client.db("codeStack").collection("questions");
+    const answerCollection = client.db("codeStack").collection("answers");
 
     app.post("/jwt", (req, res) => {
       const user = req.body;
@@ -85,6 +87,45 @@ async function run() {
       res.send(result);
     });
 
+    app.get("/users/admin/:email", verifyJWT, async (req, res) => {
+      const email = req.params.email;
+
+      if (req.decoded.email !== email) {
+        return res.send({ admin: false });
+      }
+
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      const result = { admin: user?.role === "admin" };
+      res.send(result);
+    });
+
+    app.patch("/users/admin/:id", async (req, res) => {
+      const id = req.params.id;
+      const newRole = req.body.role;
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          role: newRole,
+        },
+      };
+      const result = await usersCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    });
+
+    app.patch("/users/normalUser/:id", async (req, res) => {
+      const id = req.params.id;
+      const newRole = req.body.role;
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          role: newRole,
+        },
+      };
+      const result = await usersCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    });
+
     //Get User With Email Query
     app.get('/user', async (req, res) => {
       const userEmail = req.query.email;
@@ -100,38 +141,24 @@ async function run() {
       const options = { upsert: true };
       const updatedUser = req.body;
       const newUser = {
-          $set: {
-              name: updatedUser.name,
-              imgURL: updatedUser.imgURL,
-              age: updatedUser.age,
-              gender: updatedUser.gender,
-              portfolioURL: updatedUser.portfolioURL,
-              country: updatedUser.country,
-              city: updatedUser.city,
-              facebookURL: updatedUser.facebookURL,
-              twitterURL: updatedUser.twitterURL,
-              githubURL: updatedUser.githubURL,
-              selected: updatedUser.selected,
-              aboutMe: updatedUser.aboutMe,
-          }
+        $set: {
+          name: updatedUser.name,
+          imgURL: updatedUser.imgURL,
+          age: updatedUser.age,
+          gender: updatedUser.gender,
+          portfolioURL: updatedUser.portfolioURL,
+          country: updatedUser.country,
+          city: updatedUser.city,
+          facebookURL: updatedUser.facebookURL,
+          twitterURL: updatedUser.twitterURL,
+          githubURL: updatedUser.githubURL,
+          selected: updatedUser.selected,
+          aboutMe: updatedUser.aboutMe,
+        }
       }
       const result = await usersCollection.updateOne(filter, newUser, options);
       res.send(result)
   })
-
-    app.patch('/users/:id', verifyJWT, async (req, res) => {
-      const id = req.params.id;
-      const data = req.body;
-      const filter = { _id: new ObjectId(id) };
-      const updateDoc = {
-        $set: {
-          name: data.name,
-          photo: data.photo,
-        },
-      };
-      const result = await classCollection.updateOne(filter, updateDoc);
-      res.send(result);
-    });
 
     // add a questions api
     app.post("/questions", async (req, res) => {
@@ -140,6 +167,7 @@ async function run() {
       res.send(result);
     });
 
+    //Get the Questions
     app.get("/questions", async (req, res) => {
       const result = await questionsCollection.find().toArray();
       res.send(result);
@@ -148,14 +176,14 @@ async function run() {
     // Check valid or non valid username
     app.get("/check-username", async (req, res) => {
       const username = req.query.username;
-    
+
       if (!username) {
         return res.status(400).send({ error: true, message: "Username is required" });
       }
-    
+
       const query = { username: username };
       const existingUser = await usersCollection.findOne(query);
-    
+
       if (existingUser) {
         res.send({ message: "Username already exists!" });
       } else {
@@ -164,12 +192,135 @@ async function run() {
     });
 
     //Get Details with id
-    app.get('/question-details/:id', async(req, res) => {
+    app.get('/question-details/:id', async (req, res) => {
       const id = req.params.id;
-      const query = {_id: new ObjectId(id)}
+      const query = { _id: new ObjectId(id) }
       const result = await questionsCollection.findOne(query);
       res.send(result);
     })
+
+    //Post Answers
+    app.post("/answers", async (req, res) => {
+      const ansData = req.body;
+      const result = await answerCollection.insertOne(ansData);
+      res.send(result);
+    });
+
+    //Get Answers
+    app.get("/answers", async (req, res) => {
+      const result = await answerCollection.find().toArray();
+      res.send(result);
+    })
+
+    //Set the answer id in the questions
+    app.patch('/question/:id', async (req, res) => {
+      const id = req.params.id;
+      console.log('Received data:', req.body);
+
+      const filter = { _id: new ObjectId(id) }
+      const updatedUser = req.body;
+      const newData = {
+        $set: {
+          answersId: updatedUser.answersId,
+        }
+      }
+      const result = await questionsCollection.updateOne(filter, newData);
+      res.send(result)
+    })
+
+    //ID query for the get answer
+    app.get('/answer/:id', async (req, res) => {
+      const id = req.params.id;
+      const query = { questionID: id }
+      const result = await answerCollection.find(query).toArray();
+      res.send(result);
+    })
+
+    //Email query for the get questions
+    app.get('/questions/:email', async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email }
+      const result = await questionsCollection.find(query).toArray();
+      res.send(result);
+    })
+
+    //Email query for the get Answers
+    app.get('/answers/:email', async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email }
+      const result = await answerCollection.find(query).toArray();
+      res.send(result);
+    })
+
+    // Add questions view count to database
+    app.put('/question-detail/:id', async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) }
+      const options = { upsert: true };
+      const updatedQuestion = req.body;
+      const newDetails = {
+        $set: {
+          totalViews: updatedQuestion.clickCount,
+        }
+      }
+      const result = await questionsCollection.updateOne(filter, newDetails, options);
+      res.send(result)
+    })
+
+    //Vote api
+    app.post('/like/:id', async(req, res)=>{
+      const queId = req.params.id;
+      const user = req.query.user;
+      console.log(queId, user);
+      const filter = {_id: new ObjectId(queId)}
+      const updateDoc ={
+        $addToSet: {likes: user}
+      };
+      const updateResult = await questionsCollection.updateOne(filter, updateDoc);
+      res.send({updateResult});
+    })
+
+    app.get("/statistics", verifyJWT, verifyAdmin, async (req, res) => {
+      try {
+        const pipeline = [
+          {
+            $group: {
+              _id: null,
+              usersCount: { $sum: 1 },
+              questionsCount: { $sum: 1 },
+              answersCount: { $sum: 1 },
+            },
+          },
+          {
+            $project: {
+              _id: 0,
+              usersCount: 1,
+              questionsCount: 1,
+              answersCount: 1,
+            },
+          },
+        ];
+    
+        const statistics = await Promise.all([
+          usersCollection.aggregate(pipeline).toArray(),
+          questionsCollection.aggregate(pipeline).toArray(),
+          answerCollection.aggregate(pipeline).toArray(),
+        ]);
+    
+        // Combine the results into a single object
+        const result = {
+          usersCount: statistics[0][0]?.usersCount || 0,
+          questionsCount: statistics[1][0]?.questionsCount || 0,
+          answersCount: statistics[2][0]?.answersCount || 0,
+        };
+    
+        res.json(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Server error" });
+      }
+    });
+    
 
     app.post('/like/:id', async(req, res)=>{
       const queId = req.params.id;
