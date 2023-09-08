@@ -191,6 +191,29 @@ async function run() {
       res.send(result);
     })
 
+    //Email query for the get Answers
+    app.get('/answers/:email', async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email }
+      const result = await answerCollection.find(query).toArray();
+      res.send(result);
+    })
+
+    // Add questions view count to database
+    app.put('/question-detail/:id', async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) }
+      const options = { upsert: true };
+      const updatedQuestion = req.body;
+      const newDetails = {
+        $set: {
+          totalViews: updatedQuestion.clickCount,
+        }
+      }
+      const result = await questionsCollection.updateOne(filter, newDetails, options);
+      res.send(result)
+    })
+
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
