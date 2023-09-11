@@ -53,7 +53,7 @@ async function run() {
     app.post("/jwt", (req, res) => {
       const user = req.body;
       const token = jwt.sign(user, process.env.Access_token_secret, {
-        expiresIn: "1h",
+        expiresIn: "24h",
       });
       res.send({ token });
     });
@@ -158,7 +158,7 @@ async function run() {
       }
       const result = await usersCollection.updateOne(filter, newUser, options);
       res.send(result)
-  })
+    })
 
     // add a questions api
     app.post("/questions", async (req, res) => {
@@ -252,34 +252,51 @@ async function run() {
       res.send(result);
     })
 
-    // Add questions view count to database
-    app.put('/question-detail/:id', async (req, res) => {
-      const id = req.params.id;
-      const filter = { _id: new ObjectId(id) }
-      const options = { upsert: true };
-      const updatedQuestion = req.body;
-      const newDetails = {
-        $set: {
-          totalViews: updatedQuestion.clickCount,
-        }
-      }
-      const result = await questionsCollection.updateOne(filter, newDetails, options);
-      res.send(result)
-    })
-
     //Vote api
-    app.post('/like/:id', async(req, res)=>{
+    app.post('/vote/:id', async (req, res) => {
       const queId = req.params.id;
-      const user = req.query.user;
+      const user = req.body.email;
       console.log(queId, user);
-      const filter = {_id: new ObjectId(queId)}
-      const updateDoc ={
-        $addToSet: {QuestionsVote: user}
+      const filter = { _id: new ObjectId(queId) }
+      const updateDoc = {
+        $addToSet: { QuestionsVote: user }
       };
       const updateResult = await questionsCollection.updateOne(filter, updateDoc);
-      res.send({updateResult});
+      res.send({ updateResult });
     })
 
+    // Get all tag
+    app.get("/tags", async (req, res) => {
+      try {
+        const questions = await questionsCollection.find().toArray();
+        const selectedItemsCounts = {};
+
+        questions.forEach((question) => {
+          if (question.selected && Array.isArray(question.selected)) {
+            question.selected.forEach((item) => {
+              const lowercaseItem = item.toLowerCase();
+              if (selectedItemsCounts[lowercaseItem]) {
+                selectedItemsCounts[lowercaseItem]++;
+              } else {
+                selectedItemsCounts[lowercaseItem] = 1;
+              }
+            });
+          }
+        });
+
+        const tagArray = Object.keys(selectedItemsCounts).map((key) => ({
+          name: key,
+          count: selectedItemsCounts[key],
+        }));
+
+        res.json(tagArray);
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Server error" });
+      }
+    });
+
+    // Pipe line
     app.get("/statistics", verifyJWT, verifyAdmin, async (req, res) => {
       try {
         const pipeline = [
@@ -300,27 +317,27 @@ async function run() {
             },
           },
         ];
-    
+
         const statistics = await Promise.all([
           usersCollection.aggregate(pipeline).toArray(),
           questionsCollection.aggregate(pipeline).toArray(),
           answerCollection.aggregate(pipeline).toArray(),
         ]);
-    
+
         // Combine the results into a single object
         const result = {
           usersCount: statistics[0][0]?.usersCount || 0,
           questionsCount: statistics[1][0]?.questionsCount || 0,
           answersCount: statistics[2][0]?.answersCount || 0,
         };
-    
+
         res.json(result);
       } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Server error" });
       }
     });
-    
+
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
