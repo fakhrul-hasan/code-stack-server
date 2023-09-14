@@ -49,6 +49,7 @@ async function run() {
     const usersCollection = client.db("codeStack").collection("users");
     const questionsCollection = client.db("codeStack").collection("questions");
     const answerCollection = client.db("codeStack").collection("answers");
+    const saveCollection = client.db("codeStack").collection("saves");
 
     app.post("/jwt", (req, res) => {
       const user = req.body;
@@ -100,6 +101,7 @@ async function run() {
       res.send(result);
     });
 
+    // Change user role
     app.patch("/users/admin/:id", async (req, res) => {
       const id = req.params.id;
       const newRole = req.body.role;
@@ -191,6 +193,24 @@ async function run() {
       }
     });
 
+    //Update question details
+    app.put('/update-question/:id', async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const options = { upsert: true };
+      const updatedQuestion = req.body;
+      const newQuestionData = {
+        $set: {
+          title: updatedQuestion.title,
+          body: updatedQuestion.body,
+          selected: updatedQuestion.selected,
+          problemImages: updatedQuestion.problemImages,
+        }
+      }
+      const result = await questionsCollection.updateOne(filter, newQuestionData, options);
+      res.send(result)
+    })
+
     //Get Details with id
     app.get('/question-details/:id', async (req, res) => {
       const id = req.params.id;
@@ -215,8 +235,6 @@ async function run() {
     //Set the answer id in the questions
     app.patch('/question/:id', async (req, res) => {
       const id = req.params.id;
-      console.log('Received data:', req.body);
-
       const filter = { _id: new ObjectId(id) }
       const updatedUser = req.body;
       const newData = {
@@ -244,6 +262,14 @@ async function run() {
       res.send(result);
     })
 
+    //Delete Questions
+    app.delete('/delete-question/:id', async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await questionsCollection.deleteOne(query)
+      res.send(result);
+    })
+
     //Email query for the get Answers
     app.get('/answers/:email', async (req, res) => {
       const email = req.params.email;
@@ -256,7 +282,6 @@ async function run() {
     app.post('/vote/:id', async (req, res) => {
       const queId = req.params.id;
       const user = req.body.email;
-      console.log(queId, user);
       const filter = { _id: new ObjectId(queId) }
       const updateDoc = {
         $addToSet: { QuestionsVote: user }
@@ -295,6 +320,27 @@ async function run() {
         res.status(500).json({ error: "Server error" });
       }
     });
+
+    //Save the questions
+    app.post("/saves", async (req, res) => {
+      const savesData = req.body;
+      const result = await saveCollection.insertOne(savesData);
+      res.send(result);
+    });
+
+    //Get Save data with email query
+    app.get('/save/:email', async (req, res) => {
+      const email = req.params.email;
+      const query = { userEmail: email }
+      const result = await saveCollection.find(query).toArray();
+      res.send(result);
+    })
+
+    //Get All Saves Data
+    app.get("/saves", async (req, res) => {
+      const result = await saveCollection.find().toArray();
+      res.send(result);
+    })
 
     // Pipe line
     app.get("/statistics", verifyJWT, verifyAdmin, async (req, res) => {
