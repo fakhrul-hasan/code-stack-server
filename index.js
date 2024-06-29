@@ -1,37 +1,14 @@
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config({ path: "./.env" });
 const app = express();
 const jwt = require('jsonwebtoken');
-const jwt = require('jsonwebtoken');
 const port = process.env.PORT || 5000;
-
 app.use(cors());
 app.use(express.json());
 
-const verifyJWT = (req, res, next) => {
-  const authorization = req.headers.authorization;
-  if (!authorization) {
-    return res
-      .status(401)
-      .send({ error: true, message: "unauthorized access" });
-  }
-  // bearer token
-  const token = authorization.split(" ")[1];
-
-  jwt.verify(token, process.env.Access_token_secret, (err, decoded) => {
-    if (err) {
-      return res
-        .status(401)
-        .send({ error: true, message: "unauthorized access" });
-    }
-    req.decoded = decoded;
-    next();
-  });
-};
-
-const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
-const uri = `mongodb+srv://${process.env.DB_User}:${process.env.DB_Pass}@cluster0.d17riyo.mongodb.net/?retryWrites=true&w=majority`;
+const uri = `mongodb+srv://${process.env.DB_User}:${process.env.DB_Pass}@cluster0.d9amltv.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
@@ -41,6 +18,22 @@ const client = new MongoClient(uri, {
     deprecationErrors: true,
   },
 });
+
+const verifyJWT = (req, res, next) => {
+  const authorization = req.headers.authorization;
+  if (!authorization) {
+    return res.status(401).send({ error: true, message: "unauthorized access" });
+  }
+  const token = authorization.split(" ")[1];
+
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+    if (err) {
+      return res.status(401).send({ error: true, message: "unauthorized access" });
+    }
+    req.decoded = decoded;
+    next();
+  });
+};
 
 async function run() {
   try {
@@ -52,32 +45,22 @@ async function run() {
     const answerCollection = client.db("codeStack").collection("answers");
     const saveCollection = client.db("codeStack").collection("saves");
 
+    //JWT
     app.post("/jwt", (req, res) => {
       const user = req.body;
-      const token = jwt.sign(user, process.env.Access_token_secret, {
-        expiresIn: "24h",
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: "30d",
       });
       res.send({ token });
     });
 
-    // verify admin
-    const verifyAdmin = async (req, res, next) => {
-      const email = req.decoded.email;
-      const query = { email: email };
-      const user = await usersCollection.findOne(query);
-      if (user?.role !== "admin") {
-        return res
-          .status(403)
-          .send({ error: true, message: "Forbidden Access" });
-      }
-      next();
-    };
-
+    // Get all users
     app.get("/users", async (req, res) => {
-      const result = await usersCollection.find().toArray();
+      const result = await usersCollection.find().sort({ _id: -1 }).toArray();
       res.send(result);
     });
 
+    //Post users data to database
     app.post("/users", async (req, res) => {
       const user = req.body;
       const query = { email: user.email };
@@ -85,17 +68,34 @@ async function run() {
       if (existingUser) {
         return res.send({ message: "User already exists" });
       }
+      user.role = user.role || 'normalUser'; // Default to normalUser if no role is provided
       const result = await usersCollection.insertOne(user);
       res.send(result);
     });
 
+    // Get Google user by email
+    app.get("/users/google/:email", async (req, res) => {
+      try {
+        const email = req.params.email;
+        const user = await usersCollection.findOne({ email, entryPoint: "google" });
+    
+        if (!user) {
+          return res.status(404).send({ message: "User not found with this Google account" });
+        }
+    
+        res.send(user);
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Server error" });
+      }
+    });
+
+    //Get admin using email query  
     app.get("/users/admin/:email", verifyJWT, async (req, res) => {
       const email = req.params.email;
-
       if (req.decoded.email !== email) {
-        return res.send({ admin: false });
+        return res.status(403).send({ admin: false });
       }
-
       const query = { email: email };
       const user = await usersCollection.findOne(query);
       const result = { admin: user?.role === "admin" };
@@ -172,27 +172,28 @@ async function run() {
 
     //Get the Questions
     app.get("/questions", async (req, res) => {
-      const result = await questionsCollection.find().toArray();
-      res.send(result);
-    })
+      try {
+        const result = await questionsCollection.find().sort({ _id: -1 }).toArray();
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Server error" });
+      }
+    });
 
     // Check valid or non valid username
     app.get("/check-username", async (req, res) => {
       const username = req.query.username;
-
-      if (!username) {
-        return res.status(400).send({ error: true, message: "Username is required" });
-      }
-
+  
       const query = { username: username };
       const existingUser = await usersCollection.findOne(query);
-
+  
       if (existingUser) {
-        res.send({ message: "Username already exists!" });
+          res.send({ success: false, message: "Username already exists!" });
       } else {
-        res.send({ message: "You can take it!" });
+          res.send({ success: true, message: "You can take it!" });
       }
-    });
+  });  
 
     //Update question details
     app.put('/update-question/:id', async (req, res) => {
@@ -342,49 +343,6 @@ async function run() {
       const result = await saveCollection.find().toArray();
       res.send(result);
     })
-
-    // Pipe line
-    app.get("/statistics", verifyJWT, verifyAdmin, async (req, res) => {
-      try {
-        const pipeline = [
-          {
-            $group: {
-              _id: null,
-              usersCount: { $sum: 1 },
-              questionsCount: { $sum: 1 },
-              answersCount: { $sum: 1 },
-            },
-          },
-          {
-            $project: {
-              _id: 0,
-              usersCount: 1,
-              questionsCount: 1,
-              answersCount: 1,
-            },
-          },
-        ];
-
-        const statistics = await Promise.all([
-          usersCollection.aggregate(pipeline).toArray(),
-          questionsCollection.aggregate(pipeline).toArray(),
-          answerCollection.aggregate(pipeline).toArray(),
-        ]);
-
-        // Combine the results into a single object
-        const result = {
-          usersCount: statistics[0][0]?.usersCount || 0,
-          questionsCount: statistics[1][0]?.questionsCount || 0,
-          answersCount: statistics[2][0]?.answersCount || 0,
-        };
-
-        res.json(result);
-      } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "Server error" });
-      }
-    });
-
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
