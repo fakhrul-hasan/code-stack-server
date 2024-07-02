@@ -173,13 +173,15 @@ async function run() {
     //Get the Questions
     app.get("/questions", async (req, res) => {
       try {
-        const result = await questionsCollection.find().sort({ _id: -1 }).toArray();
+        const skip = parseInt(req.query.skip) || 0;
+        const limit = parseInt(req.query.limit) || 10;
+        const result = await questionsCollection.find().sort({ _id: -1 }).skip(skip).limit(limit).toArray();
         res.send(result);
       } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Server error" });
       }
-    });
+    });    
 
     // Check valid or non valid username
     app.get("/check-username", async (req, res) => {
@@ -323,6 +325,32 @@ async function run() {
       }
     });
 
+    //Search API
+    app.get("/search", async (req, res) => {
+      try {
+        const { query } = req.query;
+    
+        if (!query) {
+          return res.status(400).json({ error: "Type something" });
+        }
+    
+        const regex = new RegExp(query);
+    
+        const results = await questionsCollection.find({
+          $or: [
+            { title: regex },
+            { body: regex },
+            { selected: { $elemMatch: { $regex: regex } } }
+          ]
+        }).toArray();
+    
+        res.json(results);
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Server error" });
+      }
+    });
+    
     //Save the questions
     app.post("/saves", async (req, res) => {
       const savesData = req.body;
